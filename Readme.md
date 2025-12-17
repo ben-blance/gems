@@ -1,8 +1,13 @@
-# Quant Trading Platform - Ingestion Layer
+# GEMS 
+
+
+
 
 ## Architecture Overview
 
 This Django-based ingestion system follows a pipeline architecture:
+
+![gems](https://github.com/user-attachments/assets/35f051af-c9a0-4e54-95ce-5ec58877813b)
 
 **Raw Data → Celery Queue → PostgreSQL → Bar Processing → Analytics**
 
@@ -135,8 +140,3 @@ curl "http://localhost:8000/api/analytics/alerts/?status=active"
 **Scalability**: Add more workers or switch data sources without code changes  
 **Extensibility**: Easy to add new timeframes, analytics, or data feeds  
 **Clarity**: Minimal abstractions, straightforward pipeline flow
-
-## Next Steps
-- Add WebSocket streaming to frontend
-- Implement analytics tasks (z-score, correlation, ADF test)
-- Build dashboard UI
