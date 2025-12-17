@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quant Trading Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0e27;
+            color: #e1e8ed;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+        h1 { font-size: 28px; margin-bottom: 10px; }
+        .controls {
+            background: #1a1f3a;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        label { 
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #8b92a7;
+        }
+        select, button {
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #2d3548;
+            background: #0f1629;
+            color: #e1e8ed;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        button {
+            background: #667eea;
+            border: none;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        button:hover { background: #5568d3; transform: translateY(-2px); }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: #1a1f3a;
+            padding: 20px;
+            border-radius: 12px;
+            border-left: 4px solid #667eea;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #8b92a7;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+        }
+        .stat-change {
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        .positive { color: #10b981; }
+        .negative { color: #ef4444; }
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+        .chart-container {
+            background: #1a1f3a;
+            padding: 20px;
+            border-radius: 12px;
+        }
+        .chart-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #667eea;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #8b92a7;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 Quant Trading Dashboard</h1>
+        <p>Real-time market analytics and spread monitoring</p>
+    </div>
+
+    <div class="controls">
+        <div class="control-group">
+            <label>Symbol 1</label>
+            <select id="symbol1">
+                <option value="BTCUSDT">BTC/USDT</option>
+                <option value="ETHUSDT">ETH/USDT</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>Symbol 2</label>
+            <select id="symbol2">
+                <option value="ETHUSDT">ETH/USDT</option>
+                <option value="BTCUSDT">BTC/USDT</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>Timeframe</label>
+            <select id="timeframe">
+                <option value="1s">1 Second</option>
+                <option value="1m">1 Minute</option>
+                <option value="5m">5 Minutes</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>Refresh</label>
+            <button onclick="refreshData()">Refresh All</button>
+        </div>
+    </div>
+
+    <div class="stats-grid" id="statsGrid"></div>
+
+    <div class="charts-grid">
+        <div class="chart-container">
+            <div class="chart-title">Price Chart</div>
+            <div id="priceChart"></div>
+        </div>
+        <div class="chart-container">
+            <div class="chart-title">Spread & Z-Score</div>
+            <div id="spreadChart"></div>
+        </div>
+        <div class="chart-container">
+            <div class="chart-title">Correlation & Hedge Ratio</div>
+            <div id="correlationChart"></div>
+        </div>
+    </div>
+
+    <script>
+        let refreshInterval;
+
+        async function fetchData(url) {
+            const response = await fetch(url);
+            return await response.json();
+        }
+
+        async function updateStats() {
+            const symbol1 = document.getElementById('symbol1').value;
+            const symbol2 = document.getElementById('symbol2').value;
+            const timeframe = document.getElementById('timeframe').value;
+
+            const spread = await fetchData(`/api/analytics/spread/?symbol1=${symbol1}&symbol2=${symbol2}&timeframe=${timeframe}&limit=1`);
+            
+            if (spread.analytics && spread.analytics.length > 0) {
+                const latest = spread.analytics[spread.analytics.length - 1];
+                
+                document.getElementById('statsGrid').innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-label">Z-Score</div>
+                        <div class="stat-value ${latest.z_score > 0 ? 'positive' : 'negative'}">
+                            ${latest.z_score.toFixed(4)}
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Hedge Ratio</div>
+                        <div class="stat-value">${latest.hedge_ratio.toFixed(6)}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Correlation</div>
+                        <div class="stat-value">${latest.correlation ? latest.correlation.toFixed(4) : 'N/A'}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Cointegrated</div>
+                        <div class="stat-value ${latest.is_cointegrated ? 'positive' : 'negative'}">
+                            ${latest.is_cointegrated ? 'YES' : 'NO'}
+                        </div>
+                        <div class="stat-change">p-value: ${latest.adf_pvalue ? latest.adf_pvalue.toFixed(4) : 'N/A'}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Spread</div>
+                        <div class="stat-value">${latest.spread.toFixed(2)}</div>
+                    </div>
+                `;
+            }
+        }
+
+        async function updatePriceChart() {
+            const symbol1 = document.getElementById('symbol1').value;
+            const symbol2 = document.getElementById('symbol2').value;
+            const timeframe = document.getElementById('timeframe').value;
+
+            const spread = await fetchData(`/api/analytics/spread/?symbol1=${symbol1}&symbol2=${symbol2}&timeframe=${timeframe}&limit=200`);
+            
+            if (spread.analytics && spread.analytics.length > 0) {
+                const timestamps = spread.analytics.map(d => d.timestamp);
+                const price1 = spread.analytics.map(d => d.symbol1_price);
+                const price2 = spread.analytics.map(d => d.symbol2_price);
+
+                const trace1 = {
+                    x: timestamps,
+                    y: price1,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: symbol1,
+                    line: { color: '#667eea', width: 2 }
+                };
+
+                const trace2 = {
+                    x: timestamps,
+                    y: price2,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: symbol2,
+                    yaxis: 'y2',
+                    line: { color: '#f093fb', width: 2 }
+                };
+
+                const layout = {
+                    paper_bgcolor: '#1a1f3a',
+                    plot_bgcolor: '#0f1629',
+                    font: { color: '#e1e8ed' },
+                    showlegend: true,
+                    legend: { x: 0, y: 1.1, orientation: 'h' },
+                    margin: { t: 20, r: 60, b: 40, l: 60 },
+                    xaxis: { gridcolor: '#2d3548' },
+                    yaxis: { 
+                        title: symbol1,
+                        gridcolor: '#2d3548',
+                        side: 'left'
+                    },
+                    yaxis2: {
+                        title: symbol2,
+                        overlaying: 'y',
+                        side: 'right'
+                    },
+                    hovermode: 'x unified'
+                };
+
+                Plotly.newPlot('priceChart', [trace1, trace2], layout, {responsive: true});
+            }
+        }
+
+        async function updateSpreadChart() {
+            const symbol1 = document.getElementById('symbol1').value;
+            const symbol2 = document.getElementById('symbol2').value;
+            const timeframe = document.getElementById('timeframe').value;
+
+            const spread = await fetchData(`/api/analytics/spread/?symbol1=${symbol1}&symbol2=${symbol2}&timeframe=${timeframe}&limit=200`);
+            
+            if (spread.analytics && spread.analytics.length > 0) {
+                const timestamps = spread.analytics.map(d => d.timestamp);
+                const spreadValues = spread.analytics.map(d => d.spread);
+                const zScores = spread.analytics.map(d => d.z_score);
+
+                const trace1 = {
+                    x: timestamps,
+                    y: spreadValues,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Spread',
+                    line: { color: '#10b981', width: 2 }
+                };
+
+                const trace2 = {
+                    x: timestamps,
+                    y: zScores,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Z-Score',
+                    yaxis: 'y2',
+                    line: { color: '#f59e0b', width: 2 }
+                };
+
+                const upperBand = { x: timestamps, y: Array(timestamps.length).fill(2), mode: 'lines', name: '+2σ', line: { dash: 'dash', color: '#ef4444' }, yaxis: 'y2' };
+                const lowerBand = { x: timestamps, y: Array(timestamps.length).fill(-2), mode: 'lines', name: '-2σ', line: { dash: 'dash', color: '#ef4444' }, yaxis: 'y2' };
+                const zeroLine = { x: timestamps, y: Array(timestamps.length).fill(0), mode: 'lines', name: 'Mean', line: { dash: 'dot', color: '#6b7280' }, yaxis: 'y2' };
+
+                const layout = {
+                    paper_bgcolor: '#1a1f3a',
+                    plot_bgcolor: '#0f1629',
+                    font: { color: '#e1e8ed' },
+                    showlegend: true,
+                    legend: { x: 0, y: 1.1, orientation: 'h' },
+                    margin: { t: 20, r: 60, b: 40, l: 60 },
+                    xaxis: { gridcolor: '#2d3548' },
+                    yaxis: { 
+                        title: 'Spread',
+                        gridcolor: '#2d3548',
+                        side: 'left'
+                    },
+                    yaxis2: {
+                        title: 'Z-Score',
+                        overlaying: 'y',
+                        side: 'right'
+                    },
+                    hovermode: 'x unified'
+                };
+
+                Plotly.newPlot('spreadChart', [trace1, trace2, upperBand, lowerBand, zeroLine], layout, {responsive: true});
+            }
+        }
+
+        async function updateCorrelationChart() {
+            const symbol1 = document.getElementById('symbol1').value;
+            const symbol2 = document.getElementById('symbol2').value;
+            const timeframe = document.getElementById('timeframe').value;
+
+            const spread = await fetchData(`/api/analytics/spread/?symbol1=${symbol1}&symbol2=${symbol2}&timeframe=${timeframe}&limit=200`);
+            
+            if (spread.analytics && spread.analytics.length > 0) {
+                const timestamps = spread.analytics.map(d => d.timestamp);
+                const correlations = spread.analytics.map(d => d.correlation);
+                const hedgeRatios = spread.analytics.map(d => d.hedge_ratio);
+
+                const trace1 = {
+                    x: timestamps,
+                    y: correlations,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Correlation',
+                    line: { color: '#8b5cf6', width: 2 }
+                };
+
+                const trace2 = {
+                    x: timestamps,
+                    y: hedgeRatios,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Hedge Ratio',
+                    yaxis: 'y2',
+                    line: { color: '#06b6d4', width: 2 }
+                };
+
+                const layout = {
+                    paper_bgcolor: '#1a1f3a',
+                    plot_bgcolor: '#0f1629',
+                    font: { color: '#e1e8ed' },
+                    showlegend: true,
+                    legend: { x: 0, y: 1.1, orientation: 'h' },
+                    margin: { t: 20, r: 60, b: 40, l: 60 },
+                    xaxis: { gridcolor: '#2d3548' },
+                    yaxis: { 
+                        title: 'Correlation',
+                        gridcolor: '#2d3548',
+                        side: 'left',
+                        range: [-1, 1]
+                    },
+                    yaxis2: {
+                        title: 'Hedge Ratio',
+                        overlaying: 'y',
+                        side: 'right'
+                    },
+                    hovermode: 'x unified'
+                };
+
+                Plotly.newPlot('correlationChart', [trace1, trace2], layout, {responsive: true});
+            }
+        }
+
+        async function refreshData() {
+            await Promise.all([
+                updateStats(),
+                updatePriceChart(),
+                updateSpreadChart(),
+                updateCorrelationChart()
+            ]);
+        }
+
+        document.getElementById('symbol1').addEventListener('change', refreshData);
+        document.getElementById('symbol2').addEventListener('change', refreshData);
+        document.getElementById('timeframe').addEventListener('change', refreshData);
+
+        refreshData();
+        refreshInterval = setInterval(refreshData, 5000);
+    </script>
+</body>
+</html>
